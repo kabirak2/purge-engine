@@ -51,7 +51,7 @@ At a macro level, PURGE is divided into three layers:
 |  (Canon, Rules, Events)     |
 +-----------------------------+
 |   Persistence & Analysis    |
-| (Snapshots, Integrity)     |
+|  (Snapshots, Integrity)     |
 +-----------------------------+
 ```
 
@@ -345,6 +345,3 @@ By enforcing canon through rules, events, and explainable validation, it enables
 * research into narrative integrity
 
 This architecture prioritizes **correctness, inspectability, and evolution** over convenience.
-
-
-### End of Document
