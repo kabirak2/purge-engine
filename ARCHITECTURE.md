@@ -1,362 +1,349 @@
-# ARCHITECTURE.md
+# ARCHITECTURE
 
-## PURGE Engine
+This document describes the internal architecture of **PURGE**: how narrative state is modeled, how logic flows through the system, and how responsibilities are separated.
 
-**Procedural Universe Realtime Game Engine**
+PURGE is designed as a **deterministic narrative engine**.
+Every architectural decision prioritizes **clarity, replayability, and correctness** over convenience.
 
+---
 
-## 1. Purpose and Scope
+## Architectural Overview
 
-PURGE is a narrative systems engine designed to model, enforce, and evolve **story canon** under formal constraints. Unlike conventional game engines that prioritize rendering or physics, PURGE treats **narrative consistency as a first-class system concern**.
+PURGE is divided into **three strict layers**:
 
-The engine is intended for:
+1. **Core Engine** — pure narrative logic
+2. **Runtime & Persistence** — state authority and disk I/O
+3. **User Interface** — inspection and controlled interaction
 
-* story-heavy games
-* interactive fiction
-* narrative simulations
-* research into AI-assisted storytelling and canon preservation
-
-This document defines the **architectural principles, subsystem boundaries, data flows, and extension points** of the PURGE engine.
-
-
-## 2. Design Philosophy
-
-PURGE is built on four core principles:
-
-1. **Canon as State**
-   Narrative truth is modeled explicitly and evolves over time.
-
-2. **Rules as Constraints**
-   Story progression is governed by enforceable, inspectable rules.
-
-3. **Events as Transactions**
-   Narrative changes occur through discrete, validated events.
-
-4. **AI as Advisor, Not Authority**
-   AI systems may propose changes but cannot mutate canon without validation.
-
-These principles distinguish PURGE from free-form story generators and prevent narrative drift, paradox collapse, and incoherent timelines.
-
-
-## 3. High-Level System Overview
-
-At a macro level, PURGE is divided into three layers:
+Each layer has explicit responsibilities and enforced boundaries.
 
 ```
-+-----------------------------+
-|          UI Layer           |
-|  (Control & Inspection)     |
-+-----------------------------+
-|        Core Engine          |
-|  (Canon, Rules, Events)     |
-+-----------------------------+
-|   Persistence & Analysis    |
-|  (Snapshots, Integrity)     |
-+-----------------------------+
+┌────────────────────────────┐
+│        User Interface      │
+│  (Streamlit panels)        │
+└────────────┬───────────────┘
+             │
+             ▼
+┌────────────────────────────┐
+│   Runtime & Project Store  │
+│  (Singleton state control) │
+└────────────┬───────────────┘
+             │
+             ▼
+┌────────────────────────────┐
+│        Core Engine         │
+│ (Canon, rules, events)    │
+└────────────────────────────┘
 ```
 
-* **UI Layer (`ui/`)**
-  Human interaction, inspection, and debugging.
+No layer bypasses another.
 
-* **Core Engine (`core/`)**
-  Canon, validation, branching, paradox handling, AI mediation.
+---
 
-* **Persistence & Analysis**
-  Snapshots, integrity scoring, telemetry, replay.
+## 1. Core Engine
 
+The **core engine** contains all narrative semantics.
+It is deterministic, serializable, and UI-agnostic.
 
-## 4. Canon System
+### Responsibilities
 
-### 4.1 Canon Definition
+The core engine is responsible for:
 
-Canon represents the authoritative narrative state and is implemented in `core/canon.py`.
+* defining the Canon data model
+* applying events to canon
+* evaluating rules and conditions
+* detecting paradoxes
+* validating proposed actions
+* replaying narrative history
+* reconstructing timeline state
+* tracking structural dependencies
 
-It consists of:
+The core engine **never**:
 
-* Metadata (title, author, version)
-* Truths (boolean or scalar facts)
-* Rules (constraints)
-* Events (historical mutations)
-* Snapshots (state checkpoints)
-* Integrity metrics
-* Dependency graph
-* Active narrative branch
+* renders UI
+* reads user input
+* writes directly to disk
+* depends on Streamlit or runtime state
 
-Canon is **append-only in spirit**: changes occur through events rather than direct mutation.
+---
 
+### Canon (`core/canon.py`)
 
-### 4.2 Canon Lifecycle
+Canon is the **authoritative narrative state**.
 
-1. Canon is initialized empty.
-2. Rules are added to constrain future events.
-3. Events are proposed and validated.
-4. Approved events mutate canon.
-5. Postconditions update truths.
-6. Snapshots and integrity are recomputed.
+It contains:
 
-Canon never silently changes.
+* metadata
+* truths (boolean facts)
+* rules (constraints)
+* events (history)
+* acts (timeline structure)
+* logs, snapshots, integrity data
 
+Canon:
 
-## 5. Rule System and Validation
+* is mutated only through events
+* is fully serializable to JSON
+* can be reconstructed from history
+* exposes read-only analysis methods (e.g. paradox detection)
 
-### 5.1 Rule Structure
+Canon itself does not decide *when* it is saved.
 
-Rules are formal constraints defined in `core/axiom.py` and enforced by `core/validator.py`.
+---
 
-A rule consists of:
+### Event Model
 
-* Scope
-* Conditions (logical predicates)
-* Constraint type (forbid, require, limit)
-* Target and value
-* Reason and metadata
-* Strength and decay properties
+Events are the **only mutation path**.
 
-Rules are explicit, inspectable objects—not implicit logic.
+An event:
 
+* belongs to an act
+* declares truth mutations
+* is appended immutably
+* is logged for replay
 
-### 5.2 Validation Pipeline
+All higher-level reasoning (validation, paradox detection, replay) is built on top of event history.
 
-When an action (e.g., event insertion) is attempted:
+---
 
-1. Context is constructed (e.g., act number).
-2. Rule conditions are evaluated.
-3. Matching constraints are collected.
-4. Blocking rules prevent mutation.
-5. Violations are returned with explanations.
+### Rule Engine
 
-Validation is **deterministic and explainable**.
+Rules are **declarative constraints**, not actions.
 
+Rules:
 
-## 6. Event and Timeline Model
+* may activate conditionally based on truths
+* may forbid specific truths
+* have severity (`hard` or `soft`)
+* never mutate canon directly
 
-### 6.1 Events
+Rules are evaluated by:
 
-Events are discrete narrative transactions defined by:
+* the validator (pre-action)
+* the paradox engine (post-state)
 
-* ID
-* Name
-* Description
-* Act / temporal position
-* Tags
-* Dependencies
-* Postconditions
+---
 
-Events are stored in canonical order and logged.
+### Paradox Engine (`core/paradox_engine.py`)
 
+The paradox engine is a **read-only analysis system**.
 
-### 6.2 Timeline Semantics
+A paradox exists if:
 
-The timeline is not strictly linear:
+* a hard rule is active
+* its conditions are met
+* it forbids a truth
+* that truth is currently true
 
-* Events may depend on others
-* Branches may diverge
-* Replays may reconstruct alternate histories
+Paradox detection:
 
-Temporal coherence is enforced through validation, not timestamps alone.
+* does not block events
+* does not modify state
+* reports contradictions only
 
+This separation is intentional.
 
-## 7. Branching and Paradox Handling
+---
 
-### 7.1 Branching Model
+### Validation Engine (`core/validator.py`)
 
-Implemented across:
+Validation answers a different question than paradox detection:
 
-* `core/branching.py`
-* `core/branch_merge.py`
-* `core/replay.py`
+> “Should this action be allowed right now?”
 
-Each branch represents a self-consistent canon evolution.
+Validation:
 
-Branches may:
+* runs before an event is applied
+* checks rules against proposed changes
+* returns structured blocked/warned results
+* never mutates canon
 
-* Fork
-* Replay events
-* Merge under constraint reconciliation
+Validation and paradox detection are separate systems by design.
 
+---
 
-### 7.2 Paradox Detection
+### Replay & Timeline (`core/replay.py`, `core/timeline.py`)
 
-Paradoxes are detected via:
+Replay reconstructs canon from history.
 
-* Dependency conflicts
-* Rule violations
-* Integrity degradation
+Timeline logic:
 
-Handled in:
+* replays events incrementally
+* captures canon state after each act
+* evaluates paradoxes per step
 
-* `core/paradox.py`
-* `core/repair.py`
+Timeline state is **derived**, not stored.
 
-Resolution strategies include:
+---
 
-* Event rejection
-* Rule reinforcement
-* Branch isolation
-* Canon repair
+## 2. Runtime & Persistence Layer
 
+The runtime layer is the **only mutable authority** outside the core.
 
-## 8. Integrity, Analytics, and Telemetry
+It answers one question:
 
-### 8.1 Integrity Model
+> “Which canon is active right now, and where is it stored?”
 
-Canon integrity is computed in `core/integrity.py` and reflects:
+---
 
-* Rule compliance
-* Narrative consistency
-* Dependency satisfaction
+### Project Store (`core/project_store.py`)
 
-Integrity is a **quantitative signal**, not a binary flag.
+The ProjectStore:
 
+* owns the active Canon instance
+* tracks the active project file
+* enforces save discipline
+* prevents anonymous mutation
 
-### 8.2 Analytics and Telemetry
+Only one project can be active at a time.
 
-Subsystems:
+---
 
-* `core/analytics.py`
-* `core/telemetry.py`
-* `core/risk.py`
-* `core/fatigue.py`
+### Runtime API (`core/runtime.py`)
 
-Used to:
+The runtime exposes controlled access to the ProjectStore.
 
-* Measure narrative strain
-* Detect overused tropes
-* Identify risky story paths
-* Support research analysis
+It:
 
-These systems observe canon; they do not mutate it.
+* enforces singleton behavior
+* mediates all saves
+* applies events through Canon
+* prevents invalid operations (e.g. saving without a project)
 
+No UI code bypasses the runtime.
 
-## 9. VerseMind: AI Proposal Interface
+---
 
-### 9.1 Role of VerseMind
+### Persistence (`core/filesystem.py`)
 
-VerseMind is an AI-assisted proposal engine, implemented in:
+Persistence is handled via JSON files.
 
-* `core/versemind.py`
-* `core/versemind_prompt.py`
-* `core/versemind_schema.py`
+Characteristics:
 
-VerseMind:
+* explicit file boundaries
+* no implicit autosave
+* no database
+* no background writes
 
-* Interprets human intent
-* Proposes structured changes
-* Provides confidence and rationale
+All saved data is human-readable and replayable.
 
-Experimental local LLM execution (e.g., via Ollama) is supported through backend adapters but is not required for engine operation.
+---
 
-It **cannot** directly modify canon.
+## 3. User Interface Layer
 
+The UI layer is built using **Streamlit**.
 
-### 9.2 Human-in-the-Loop Enforcement
+It is intentionally thin.
 
-All AI proposals must be:
+---
 
-1. Presented to a human
-2. Explicitly approved
-3. Validated against rules
+### UI Responsibilities
 
-This prevents AI-driven canon collapse.
+The UI is responsible for:
 
+* displaying canon state
+* collecting user input
+* calling runtime APIs
+* rendering engine results
 
-### 9.3 LLM Backend Abstraction
+The UI **never**:
 
-VerseMind does not depend on any specific large language model or execution runtime.
-All LLM interaction occurs through backend adapters that conform to VerseMind’s
-proposal schema and validation requirements.
+* implements narrative logic
+* mutates canon directly
+* evaluates rules
+* infers meaning
 
-Local and remote LLM backends are treated as interchangeable execution layers.
-Experimental backends may be introduced without altering canon logic, rule enforcement,
-or validation semantics.
+---
 
-This design ensures that AI integration remains optional, inspectable, and replaceable.
+### UI Panels
 
+Each panel maps to one responsibility:
 
-## 10. Persistence and Snapshots
+| Panel      | Responsibility           |
+| ---------- | ------------------------ |
+| Project    | lifecycle & persistence  |
+| Truths     | fact editing             |
+| Rules      | constraint authoring     |
+| Events     | state mutation           |
+| Timeline   | causal visualization     |
+| Paradox    | contradiction inspection |
+| Validation | rule feedback            |
+| Debugger   | replay inspection        |
 
-### 10.1 Snapshots
+Panels do not communicate with each other directly.
 
-Snapshots (`core/snapshot.py`) capture canon state at key points:
+---
 
-* After events
-* Before merges
-* During repair operations
+## Data Flow
 
-Used for:
+All operations follow the same pattern:
 
-* Rollback
-* Replay
-* Analysis
+1. User interacts with UI
+2. UI calls runtime API
+3. Runtime delegates to core
+4. Canon mutates (via events only)
+5. Runtime persists changes
+6. UI re-renders from state
 
+There are no hidden shortcuts.
 
-### 10.2 Filesystem Layout
+---
 
-Persistence logic resides in `core/filesystem.py`.
+## Determinism & Guarantees
 
-Runtime project data is stored **outside version control** and treated as user data, not engine state.
+PURGE guarantees:
 
+* identical events + order → identical canon
+* replay produces the same result every time
+* no hidden randomness
+* no implicit state mutation
 
-## 11. UI Architecture
+This enables:
 
-The UI layer (`ui/`) is built with Tkinter and serves as a **control surface**, not engine logic.
+* debugging
+* verification
+* long-form consistency
+* safe future AI integration
 
-Panels include:
+---
 
-* Canon inspection
-* Rule editing
-* Timeline management
-* Validation console
-* VerseMind interface
-* Debugging and paradox views
+## Technologies Used
 
-UI modules never bypass core validation.
+Only technologies currently in use are listed.
 
+* **Python 3**
+* **Streamlit** (UI)
+* **JSON** (persistence)
+* Python standard library only
 
-## 12. Data Flow Summary
+No databases.
+No ORMs.
+No AI frameworks.
+No external services.
 
-A typical mutation flow:
+---
 
-```
-Human / AI Intent
-        ↓
-Proposal (VerseMind or Manual)
-        ↓
-Validation (Rules, Context)
-        ↓
-Event Application
-        ↓
-Canon Mutation
-        ↓
-Snapshot + Integrity Update
-        ↓
-Telemetry & Analytics
-```
+## Architectural Rules (Non-Negotiable)
 
-This pipeline is invariant.
+* Core logic never imports UI
+* UI never implements logic
+* Runtime owns persistence
+* Events are the only mutation path
+* Rules never mutate canon
+* Paradox detection never blocks actions
 
+Breaking these rules is considered a bug.
 
-## 13. Extension Points
+---
 
-PURGE is designed for extension at:
+## Architectural Intent
 
-* Rule languages
-* AI backends
-* Integrity metrics
-* Visualization layers
-* Persistence strategies
+This architecture exists to make narratives:
 
-Extensions must respect canon immutability and validation discipline.
+* inspectable
+* replayable
+* debuggable
+* logically constrained
+* extensible without collapse
 
-
-## 14. Conclusion
-
-PURGE formalizes narrative as a **governed system**, not a generative free-for-all.
-By enforcing canon through rules, events, and explainable validation, it enables:
-
-* long-form narrative coherence
-* safe AI assistance
-* reproducible story simulations
-* research into narrative integrity
-
-This architecture prioritizes **correctness, inspectability, and evolution** over convenience.
+PURGE favors **explicit structure** over convenience.

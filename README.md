@@ -1,259 +1,328 @@
-# PURGE Engine
+# PURGE — Narrative State & Timeline Engine
 
-**Procedural Universe Realtime Game Engine**
+PURGE is a system for **building, evolving, and inspecting narrative canon** as structured state.
 
----
+Instead of treating stories as text, PURGE treats them as:
 
-## Overview
+* facts
+* rules
+* events
+* time
 
-PURGE is a research-oriented narrative systems engine focused on **canon preservation, rule-governed story evolution, and explainable narrative validation**.
+This makes narratives **traceable, replayable, and logically inspectable**.
 
-The engine models narrative as a governed system rather than a generative free-for-all. All changes to story state are mediated through explicit rules, validated events, and inspectable decision paths. AI assistance, when used, is strictly advisory and never authoritative.
-
-PURGE is designed for experimentation in:
-
-* story-heavy game systems
-* interactive fiction engines
-* narrative consistency research
-* human–AI collaborative authorship
+PURGE is not an AI storyteller.
+It is the engine *underneath* one.
 
 ---
 
-## Core Principles
+## What PURGE Does
 
-PURGE is built around the following invariants:
+PURGE helps you answer questions like:
 
-* **Canon is explicit state**
-  Narrative truth is represented directly and evolves over time.
+* *What facts are true in the story right now?*
+* *Which rules are currently active?*
+* *When did a contradiction appear?*
+* *Which event caused it?*
+* *What did the world look like before that happened?*
 
-* **Rules are enforceable constraints**
-  Story progression is validated against formal, inspectable rules.
-
-* **Events are the only mutation mechanism**
-  Canon changes occur only through validated events.
-
-* **AI is advisory, not authoritative**
-  AI systems may propose changes but cannot mutate canon.
-
-* **Explainability is mandatory**
-  All rejections and constraints provide reasons.
+It does this by modeling narratives as structured data instead of prose.
 
 ---
 
-## System Structure
-
-The engine is organized into three conceptual layers.
-
-### Core Engine (`core/`)
-
-The core layer implements all narrative logic, including:
-
-* Canon state and metadata
-* Rule definition and validation
-* Event modeling and timelines
-* Branching, replay, and merge logic
-* Paradox detection and repair
-* Integrity computation
-* Analytics, telemetry, and risk signals
-* AI proposal mediation (VerseMind)
-
-This layer contains no UI logic and no hard dependency on any AI backend.
-
----
-
-### UI Layer (`ui/`)
-
-The UI layer provides a Tkinter-based control and inspection surface for the engine.
-
-It includes panels for:
-
-* Canon inspection and editing
-* Rule authoring
-* Timeline and event management
-* Validation inspection
-* VerseMind proposal review
-* Debugging and analytics views
-
-The UI does not bypass core validation or mutate canon directly.
-
----
-
-### Persistence and Runtime Data
-
-Runtime project data (e.g., saved canon states, snapshots, forks) is stored outside version control and treated as user data rather than engine state.
-
-The engine itself remains stateless between runs except through explicit persistence mechanisms.
-
----
-
-## Narrative Mutation Pipeline
-
-All narrative changes follow the same invariant pipeline:
-
-1. Human or AI intent is expressed
-2. A structured proposal is constructed
-3. Proposal is validated against rules
-4. Violations are explained if blocked
-5. Approved proposals become events
-6. Canon is mutated via the event
-7. Snapshots and integrity are updated
-8. Analytics and telemetry observe the result
-
-No step is skipped.
-
----
-
-## Canon and Rules
+## Core Ideas (Plain English)
 
 ### Canon
 
-Canon represents the authoritative narrative state and includes:
+Canon is the **current state of the story**.
 
-* Project metadata
-* Truths (facts about the narrative world)
-* Rules (constraints)
-* Events (historical mutations)
-* Snapshots
-* Integrity metrics
-* Dependency graph
-* Active narrative branch
+It includes:
 
-Canon evolves only through validated events.
+* basic metadata (title, version)
+* truths (facts that are true or false)
+* rules (constraints on what is allowed)
+* events (things that happened)
+* acts (story phases / timeline sections)
 
----
+Canon is always:
 
-### Rules
-
-Rules define constraints on narrative evolution. They may:
-
-* Forbid specific events under conditions
-* Require events or properties
-* Limit frequency or timing
-
-Rules are deterministic, inspectable, and explainable. They may decay or change strength over time but never operate implicitly.
+* deterministic
+* serializable to JSON
+* reconstructible from history
 
 ---
 
-## Events and Timelines
+### Truths (Facts)
 
-Events are discrete narrative transactions. Each event:
+Truths are simple on/off facts about the world.
 
-* Is validated before application
-* Is logged and replayable
-* May depend on other events
-* May introduce postconditions
+Example:
 
-Timelines may branch and replay. Linear time is not assumed.
-
----
-
-## Branching Model
-
-The repository follows a disciplined branching strategy:
-
-* `main` — stable, citable engine state
-* `dev` — integration and staging
-* `experimental/*` — isolated research experiments
-
-Narrative branching within the engine is conceptually separate from Git branching, but both follow similar principles of isolation and reconciliation.
-
----
-
-## VerseMind and AI Assistance
-
-VerseMind is the engine’s AI mediation layer.
-
-Its responsibilities are:
-
-* Interpreting natural-language intent
-* Producing structured narrative proposals
-* Providing rationale and confidence estimates
-
-VerseMind does **not**:
-
-* Modify canon directly
-* Bypass validation
-* Resolve paradoxes autonomously
-
-### LLM Backends
-
-LLM execution is optional and abstracted behind VerseMind.
-
-* No LLM backend is required to run the engine
-* Local experimental backends (e.g., Ollama) may be used
-* Backends are interchangeable and non-authoritative
-
-All AI-generated proposals remain subject to human approval and formal validation.
-
----
-
-## Documentation
-
-The repository includes the following formal documents:
-
-* **ARCHITECTURE.md**
-  Full system design specification
-
-* **DIAGRAMS.md**
-  Dependency graphs and data-flow diagrams (Mermaid)
-
-* **LLM_BACKENDS.md**
-  Description of AI backend abstraction and experimental support
-
-These documents are normative: engine behavior should match them.
-
----
-
-## Project Layout
-
-```
-purge/
-├── core/              # Narrative engine logic
-├── ui/                # Control and inspection UI
-├── main.py            # Application entry point
-├── ARCHITECTURE.md
-├── DIAGRAMS.md
-├── LLM_BACKENDS.md
-└── README.md
+```json
+{
+  "world_is_stable": true,
+  "character_is_alive": false
+}
 ```
 
-Runtime project data is intentionally excluded from version control.
+Important rules:
+
+* Truths do not change by themselves
+* Truths are changed **only by events**
+* Truths are checked by rules
+
+Truths describe *what is*, not *why*.
 
 ---
 
-## Running the Engine
+### Rules (Constraints)
 
-```bash
-python main.py
+Rules define **what is allowed or forbidden**.
+
+They do not change the story.
+They only evaluate it.
+
+Example:
+
+```json
+{
+  "id": "no_resurrection",
+  "severity": "hard",
+  "conditions": {
+    "all": ["world_is_stable"]
+  },
+  "constraint": {
+    "forbid_truth": "character_is_alive"
+  }
+}
 ```
 
-This launches the UI for interactive narrative management.
+This means:
+
+> If the world is stable, the character must not be alive.
+
+Rules:
+
+* may be conditional
+* may be strict (`hard`) or advisory (`soft`)
+* never mutate canon themselves
 
 ---
 
-## Project Status
+### Events (What Happens)
 
-PURGE is an **active research-grade prototype**.
+Events are the **only way the story changes**.
 
-The focus is on:
+An event records:
 
-* narrative integrity modeling
-* rule-governed story evolution
-* explainable validation
-* controlled AI assistance
+* *what happened*
+* *when it happened*
+* *what facts it changed*
 
-APIs and interfaces are expected to evolve.
+Example:
 
----
-
-## Citation (Draft)
-
-If referencing this work:
-
+```json
+{
+  "id": "evt_revival",
+  "act": 2,
+  "name": "Character returns",
+  "sets_truths": {
+    "character_is_alive": true
+  }
+}
 ```
-PURGE Engine: A Rule-Governed Narrative Systems Framework
-```
+
+Events are:
+
+* applied in order
+* irreversible
+* logged permanently
+* replayable
+
+Everything flows from events.
 
 ---
 
-## End of Document
+### Acts (Timeline Structure)
+
+Acts divide the story into **clear phases**.
+
+They help you:
+
+* group events
+* see progression
+* inspect state at specific points
+* understand causality
+
+Acts do not enforce logic.
+They provide structure and clarity.
+
+---
+
+## Timeline View
+
+The Timeline shows:
+
+* acts in order
+* events inside each act
+* the state of the world after each act
+
+This lets you see:
+
+* how facts evolved
+* where rules became active
+* exactly when contradictions appeared
+
+The timeline is **derived from events**, not stored separately.
+
+---
+
+## Paradox Detection
+
+A paradox means:
+
+> The current story state violates an active hard rule.
+
+A paradox exists only if:
+
+1. A rule is marked `hard`
+2. Its conditions are met
+3. It forbids a specific truth
+4. That truth is currently true
+
+Paradox detection:
+
+* never changes canon
+* never blocks actions automatically
+* only reports contradictions
+
+It answers:
+
+> “Is the story logically inconsistent *right now*?”
+
+---
+
+## Validation (Different From Paradox)
+
+Validation checks:
+
+> “Should this event be allowed?”
+
+It runs **before** an event is applied.
+
+Validation may:
+
+* block an event
+* warn about consequences
+
+Paradox detection runs **after** events and looks at the whole state.
+
+They serve different purposes and are kept separate intentionally.
+
+---
+
+## Replay & Debugging
+
+PURGE can replay the story from history.
+
+This allows you to:
+
+* rebuild canon step by step
+* inspect earlier states
+* debug unexpected outcomes
+* verify determinism
+
+Replay always produces the same result given the same events.
+
+---
+
+## Projects & Persistence
+
+Stories are stored as **projects**.
+
+Each project:
+
+* owns one canon
+* is saved as JSON
+* must be explicitly opened or created
+* prevents accidental or anonymous mutation
+
+No story changes are allowed without an active project.
+
+---
+
+## User Interface
+
+The interface is built to **inspect and control**, not guess or automate.
+
+It includes panels for:
+
+* project management
+* truths
+* rules
+* events
+* timeline
+* paradox inspection
+* validation feedback
+* replay debugging
+
+The UI never contains story logic.
+
+---
+
+## Technologies Used
+
+Only technologies currently in use are listed.
+
+### Language & Runtime
+
+* **Python 3**
+* Python standard library
+
+### UI
+
+* **Streamlit**
+
+  * panel-based interface
+  * deterministic reruns
+  * state inspection
+
+### Data Format
+
+* **JSON**
+
+  * canonical storage
+  * replayable structure
+
+No databases, ORMs, AI frameworks, or external services are used at this stage.
+
+---
+
+## What PURGE Is (and Isn’t)
+
+**PURGE is:**
+
+* a narrative state engine
+* a logic and timeline tool
+* a debugging system for stories
+
+**PURGE is not:**
+
+* a text generator
+* an AI storyteller
+* a probabilistic system
+* a black box
+
+Those layers can be added later, *on top* of this engine.
+
+---
+
+## Current State
+
+* Canon system: stable
+* Event system: stable
+* Timeline & acts: stable
+* Paradox detection: stable
+* Validation: stable
+
+PURGE is suitable for experimentation, tooling, and extension.

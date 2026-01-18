@@ -1,125 +1,291 @@
-# PURGE Engine — System Diagrams
+# DIAGRAMS
 
-This document provides formal diagrams describing the structural and data-flow
-architecture of the PURGE narrative engine. Diagrams are rendered using Mermaid
-and are intended for both technical inspection and academic communication.
+This document provides **visual representations** of PURGE’s architecture, data flow, and narrative mechanics.
 
----
-
-## 1. Core Engine Dependency Graph
-
-This diagram illustrates the dependency relationships between major subsystems
-in the `core/` layer.
-
-```mermaid
-graph TD
-    Canon --> Validator
-    Canon --> Integrity
-    Canon --> Snapshot
-    Canon --> DependencyGraph
-
-    Validator --> Axiom
-    Validator --> Rules
-
-    Branching --> Canon
-    BranchMerge --> Branching
-    Replay --> Snapshot
-
-    Paradox --> Integrity
-    Paradox --> Repair
-
-    VerseMind --> Intent
-    VerseMind --> Schema
-    VerseMind --> Prompt
-    VerseMind --> LLMBackend
-
-    LLMBackend --> Ollama
-
-
-    Analytics --> Canon
-    Telemetry --> Canon
-    Risk --> Canon
-    Fatigue --> Canon
-````
-
-**Interpretation**
-
-* `Canon` is the central state authority.
-* Validation, integrity, and snapshots depend on canon, not vice versa.
-* AI systems (VerseMind) never bypass validation or mutate canon directly.
-* Analytics and telemetry are observational only.
+All diagrams reflect the **current implementation**, not future plans.
 
 ---
 
-## 2. Narrative Mutation Data Flow
+## 1. High-Level System Architecture
 
-This diagram represents the invariant pipeline through which narrative changes
-are proposed, validated, and applied.
+This diagram shows the three-layer structure of PURGE and how data flows between them.
 
-```mermaid
-flowchart TD
-    Intent[Human or AI Intent]
-    -->|Optional| LLM[LLM Backend]
-    --> Proposal[Structured Proposal]
-
-
-    Proposal --> Validation[Rule Validation]
-
-    Validation -->|Rejected| Explanation[Explain Violation]
-    Validation -->|Approved| Event[Event Construction]
-
-    Event --> CanonMutation[Canon Mutation]
-    CanonMutation --> Snapshot[Snapshot Creation]
-    Snapshot --> Integrity[Integrity Recalculation]
-    Integrity --> Telemetry[Analytics & Telemetry]
+```
+┌─────────────────────────────────────┐
+│            User Interface            │
+│        (Streamlit Panels)            │
+│                                     │
+│  Project | Truths | Rules | Events   │
+│  Timeline | Paradox | Debugger       │
+└───────────────┬─────────────────────┘
+                │ runtime API calls
+                ▼
+┌─────────────────────────────────────┐
+│        Runtime & Project Store       │
+│     (Singleton State Authority)      │
+│                                     │
+│  - active project                    │
+│  - active Canon instance             │
+│  - save discipline                   │
+└───────────────┬─────────────────────┘
+                │ delegates logic
+                ▼
+┌─────────────────────────────────────┐
+│             Core Engine              │
+│                                     │
+│  Canon | Rules | Events | Timeline   │
+│  Paradox Engine | Validator | Replay │
+└─────────────────────────────────────┘
 ```
 
-**Key Properties**
+Key rule:
 
-* All mutations are explainable.
-* Canon changes occur only through validated events.
-* Integrity is recomputed after every accepted mutation.
-* Observational systems never influence control flow.
+> UI never talks directly to core logic — all access goes through the runtime.
 
 ---
 
-## 3. Branching, Replay, and Paradox Handling
+## 2. Canon Data Model
 
-This diagram describes how PURGE models branching timelines and paradox isolation.
+Canon is the **authoritative narrative state**.
 
-```mermaid
-flowchart LR
-    Main[Main Canon]
-        -->|Fork| BranchA[Branch A]
-        -->|Fork| BranchB[Branch B]
-
-    BranchA --> ReplayA[Replay Events]
-    BranchB --> ReplayB[Replay Events]
-
-    ReplayA --> IntegrityA[Integrity Check]
-    ReplayB --> IntegrityB[Integrity Check]
-
-    IntegrityA -->|Stable| Merge[Merge Attempt]
-    IntegrityB -->|Paradox| Isolate[Branch Isolation]
-
-    Merge --> Main
+```
+Canon
+│
+├─ meta
+│   ├─ title
+│   ├─ author
+│   └─ version
+│
+├─ truths
+│   ├─ fact_key → bool
+│   └─ ...
+│
+├─ rules
+│   ├─ conditions
+│   ├─ constraint
+│   ├─ severity
+│   └─ override
+│
+├─ acts
+│   ├─ { id, label }
+│   └─ ...
+│
+├─ events
+│   ├─ id
+│   ├─ act
+│   ├─ name
+│   └─ sets_truths
+│
+├─ event_log
+├─ snapshots
+├─ integrity
+└─ dependencies
 ```
 
-**Interpretation**
+Canon itself does **not** decide:
 
-* Branches are first-class narrative timelines.
-* Replay reconstructs canon deterministically.
-* Paradox detection blocks unsafe merges.
-* Failed branches are isolated rather than corrupting canon.
-
----
-
-## 4. Diagram Usage Notes
-
-* These diagrams are normative: engine behavior should match them.
-* Changes to core architecture must update this document.
-* Diagrams are suitable for inclusion in academic publications.
+* when it is saved
+* how it is displayed
+* which actions are allowed
 
 ---
 
-### End of Document
+## 3. Event-Driven State Mutation
+
+Events are the **only allowed mutation path**.
+
+```
+[ Event ]
+   │
+   ▼
+Apply to Canon
+   │
+   ├─ mutate truths
+   ├─ append to event list
+   ├─ log commit
+   ├─ update snapshots
+   └─ update integrity
+```
+
+Nothing else mutates truths directly.
+
+---
+
+## 4. Act-Based Timeline Flow
+
+Acts provide **explicit narrative time**.
+
+```
+Act 1
+ ├─ Event A
+ ├─ Event B
+ │
+ └─ Canon state after Act 1
+        │
+        ▼
+Act 2
+ ├─ Event C
+ │
+ └─ Canon state after Act 2
+        │
+        ▼
+Act 3
+ ├─ Event D
+ └─ Event E
+```
+
+Timeline state is **reconstructed**, not stored.
+
+---
+
+## 5. Paradox Detection Flow
+
+Paradox detection is **read-only**.
+
+```
+Canon State
+   │
+   ▼
+Evaluate Rules
+   │
+   ├─ Are conditions satisfied?
+   ├─ Is rule severity = hard?
+   ├─ Does rule forbid a truth?
+   └─ Is that truth currently true?
+   │
+   ▼
+Paradox Report
+```
+
+Important:
+
+* Paradox detection does **not** block events
+* It only reports inconsistency
+
+---
+
+## 6. Validation vs Paradox (Critical Distinction)
+
+```
+          ┌─────────────────┐
+          │  Proposed Event │
+          └────────┬────────┘
+                   │
+                   ▼
+           Validation Engine
+                   │
+          ┌────────┴────────┐
+          │                 │
+       Blocked            Allowed
+                             │
+                             ▼
+                        Apply Event
+                             │
+                             ▼
+                     Updated Canon
+                             │
+                             ▼
+                     Paradox Detection
+```
+
+Validation = *Should this happen?*
+Paradox = *Is the story inconsistent now?*
+
+They are intentionally separate.
+
+---
+
+## 7. Replay & Reconstruction
+
+Replay rebuilds canon from history.
+
+```
+Empty Canon
+   │
+   ├─ Apply Event 1
+   ├─ Apply Event 2
+   ├─ Apply Event 3
+   │
+   ▼
+Reconstructed Canon
+```
+
+Given the same events in the same order, replay always produces the same result.
+
+---
+
+## 8. Runtime & Persistence Control
+
+```
+UI Action
+   │
+   ▼
+Runtime API
+   │
+   ├─ check active project
+   ├─ apply mutation
+   └─ persist to disk
+           │
+           ▼
+        JSON File
+```
+
+Rules:
+
+* No active project → no save
+* No direct disk writes from UI
+* No implicit autosave
+
+---
+
+## 9. UI Responsibility Map
+
+```
+[ Project Panel ] ── lifecycle & persistence
+[ Truths Panel ]  ── fact editing
+[ Rules Panel ]   ── constraint authoring
+[ Events Panel ]  ── state mutation
+[ Timeline Panel ]── causal visualization
+[ Paradox Panel ] ── inconsistency inspection
+[ Validation ]    ── rule feedback
+[ Debugger ]      ── replay & inspection
+```
+
+Each panel:
+
+* has one responsibility
+* does not perform logic
+* calls runtime APIs only
+
+---
+
+## 10. Determinism Guarantee
+
+```
+Same Events
++ Same Order
++ Same Rules
++ Same Conditions
+──────────────────
+Same Canon State
+```
+
+There is:
+
+* no randomness
+* no hidden mutation
+* no time-based behavior
+
+---
+
+## Summary
+
+These diagrams illustrate how PURGE achieves:
+
+* explicit narrative state
+* deterministic evolution
+* traceable causality
+* debuggable contradictions
+* clean separation of concerns
+
+They are meant to be read alongside `ARCHITECTURE.md`.
