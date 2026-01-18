@@ -29,14 +29,14 @@ def main():
     "Tools",
         [
             "Project",
+            "Rules",
+            "VerseMind",
             "Paradox",
-            "Canon",
             "Debugger",
             "Analytics",
             "Validation",
-            "Rules",
-            "Timeline",
-            "VerseMind",
+            "Canon",
+            "Timeline"
         ],
     )
 
