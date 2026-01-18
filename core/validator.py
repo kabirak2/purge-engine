@@ -44,3 +44,49 @@ def validate_action(action, canon, context):
         "blocked": blocked,
         "warned": warned
     }
+
+# ---- UI ADAPTERS ----
+
+def validate_state(canon=None):
+    """
+    UI-facing adapter.
+    Performs a lightweight validation pass over the current canon state.
+    """
+    if canon is None:
+        return {
+            "status": "ok",
+            "blocked": [],
+            "warned": [],
+            "message": "No canon state provided"
+        }
+
+    blocked = []
+    warned = []
+
+    # Validate each event against rules at its act
+    for event in canon.events:
+        result = validate_action(
+            action={
+                "type": "event",
+                "value": event.get("name", "")
+            },
+            canon=canon,
+            context={
+                "act": event.get("act", 0)
+            }
+        )
+
+        blocked.extend(result.get("blocked", []))
+        warned.extend(result.get("warned", []))
+
+    status = "ok"
+    if blocked:
+        status = "blocked"
+    elif warned:
+        status = "warning"
+
+    return {
+        "status": status,
+        "blocked": blocked,
+        "warned": warned
+    }

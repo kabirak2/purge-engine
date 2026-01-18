@@ -1,9 +1,12 @@
-def detect_paradoxes(canon):
+def detect_paradoxes(canon=None):
     """
     Detects narrative paradoxes such as:
     - event preconditions not satisfied
     - postconditions contradicting existing truths
     """
+
+    if canon is None:
+        return []
 
     paradoxes = []
 

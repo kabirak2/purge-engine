@@ -19,3 +19,21 @@ def narrative_analytics(canon):
         "rule_count": len(canon.rules),
         "truth_count": len(canon.truths),
     }
+
+# ---- UI ADAPTER ----
+
+def get_metrics(canon=None):
+    """
+    UI-facing adapter.
+    Returns narrative analytics in a UI-safe format.
+    """
+    if canon is None:
+        return {
+            "total_events": 0,
+            "events_per_act": {},
+            "severity_distribution": {},
+            "rule_count": 0,
+            "truth_count": 0,
+        }
+
+    return narrative_analytics(canon)

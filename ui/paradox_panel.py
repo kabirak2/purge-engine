@@ -1,17 +1,16 @@
-import tkinter as tk
+import streamlit as st
 from core.paradox import detect_paradoxes
+from core.canon import get_canon
 
-class ParadoxPanel(tk.Frame):
-    def __init__(self, master, canon):
-        super().__init__(master)
-        self.canon = canon
+def render():
+    st.markdown("### Paradox Detector")
+    st.caption("Logical inconsistencies")
 
-        tk.Label(self, text="PARADOX DETECTOR", font=("Arial", 12)).pack(pady=5)
+    canon = get_canon()
+    paradoxes = detect_paradoxes(canon)
 
-        self.listbox = tk.Listbox(self, width=100)
-        self.listbox.pack(pady=5)
-
-        tk.Button(self, text="Scan for Paradoxes", command=self.scan).pack(pady=5)
-
-    def scan(self):
-        self.listbox
+    if not paradoxes:
+        st.success("No paradoxes detected")
+    else:
+        st.warning(f"{len(paradoxes)} paradoxes found")
+        st.json(paradoxes)

@@ -45,3 +45,13 @@ def propose(canon, intent_text):
             )
 
     return proposal
+
+def run_versemind(intent_text: str, canon: dict | None = None):
+    """
+    UI-facing adapter for VerseMind.
+    Keeps UI simple while preserving core semantics.
+    """
+    if canon is None:
+        canon = {}
+
+    return propose(canon, intent_text)

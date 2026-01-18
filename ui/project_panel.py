@@ -1,28 +1,42 @@
-import tkinter as tk
+import streamlit as st
+import os
+from core.canon import get_canon, save_current_canon
+from core.project_store import DEFAULT_PROJECT
 
-class ProjectPanel(tk.Frame):
-    def __init__(self, master, canon):
-        super().__init__(master)
-        self.canon = canon
+PROJECT_PATH = os.path.join("projects", DEFAULT_PROJECT)
 
-        tk.Label(self, text="PROJECT SETTINGS", font=("Arial", 12)).pack(pady=5)
+def render():
+    st.markdown("### Project")
+    st.caption("Persistence and system control")
 
-        tk.Label(self, text="Title").pack()
-        self.title = tk.Entry(self, width=40)
-        self.title.pack()
+    canon = get_canon()
 
-        tk.Label(self, text="Author").pack()
-        self.author = tk.Entry(self, width=40)
-        self.author.pack()
+    st.markdown("#### Active project")
+    st.code(PROJECT_PATH)
 
-        tk.Label(self, text="Version").pack()
-        self.version = tk.Entry(self, width=40)
-        self.version.insert(0, "0.1")
-        self.version.pack()
+    st.divider()
 
-        tk.Button(self, text="Apply Metadata", command=self.apply).pack(pady=5)
+    # ---------------- MANUAL SAVE ----------------
+    if st.button("💾 Save project"):
+        save_current_canon()
+        st.success("Project saved to disk.")
 
-    def apply(self):
-        self.canon.meta["title"] = self.title.get()
-        self.canon.meta["author"] = self.author.get()
-        self.canon.meta["version"] = self.version.get()
+    st.divider()
+
+    # ---------------- RESET PROJECT ----------------
+    st.markdown("#### Danger zone")
+    st.warning("This will permanently reset the current project.")
+
+    if st.button("🗑 Reset project"):
+        if os.path.exists(PROJECT_PATH):
+            os.remove(PROJECT_PATH)
+
+        # Reset in-memory canon
+        canon.truths.clear()
+        canon.rules.clear()
+        canon.events.clear()
+        canon.event_log.clear()
+        canon.snapshots.clear()
+
+        save_current_canon()
+        st.success("Project reset.")

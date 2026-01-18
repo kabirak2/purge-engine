@@ -3,7 +3,7 @@ from core.integrity import compute_integrity
 from core.dependency_graph import DependencyGraph
 from core.rule_decay import decay_rules
 from core.config import SAVE_POLICY
-
+from core.project_store import load_canon, save_canon
 
 class Canon:
     def __init__(self):
@@ -112,3 +112,27 @@ class Canon:
             data["telemetry"] = self.telemetry
 
         return data
+
+# ---- UI ADAPTER ----
+
+# Simple global canon instance for UI usage
+_CANON_INSTANCE = None
+
+
+def get_canon():
+    """
+    Returns the active Canon instance (singleton).
+    """
+    global _CANON_INSTANCE
+    if _CANON_INSTANCE is None:
+        _CANON_INSTANCE = load_canon()
+    return _CANON_INSTANCE
+
+
+def save_current_canon():
+    """
+    Persists the active Canon instance to disk.
+    """
+    global _CANON_INSTANCE
+    if _CANON_INSTANCE is not None:
+        save_canon(_CANON_INSTANCE)

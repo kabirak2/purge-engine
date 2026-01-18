@@ -1,46 +1,61 @@
-import tkinter as tk
-from core.axiom import new_rule, validate_rule
-from ui.helpers import alert
+import streamlit as st
+from core.canon import get_canon, save_current_canon
+from core.rule_decay import list_rules, update_rule
 
-class RuleEditor(tk.Frame):
-    def __init__(self, master, canon):
-        super().__init__(master)
-        self.canon = canon
-        self.rule = new_rule()
+def render():
+    st.markdown("### Rules")
+    st.caption("Narrative constraints and invariants")
 
-        tk.Label(self, text="RULE EDITOR", font=("Arial", 14)).pack(pady=5)
+    canon = get_canon()
 
-        tk.Label(self, text="Rule Reason (Required)").pack()
-        self.reason = tk.Entry(self, width=40)
-        self.reason.pack()
+    # ---------------- CREATE NEW RULE ----------------
+    with st.expander("➕ Add new rule", expanded=True):
+        rule_id = st.text_input("Rule ID", placeholder="e.g. no_time_travel")
+        rule_text = st.text_area(
+            "Rule description",
+            placeholder="Describe the constraint in plain language",
+            height=100
+        )
 
-        tk.Label(self, text="Constraint Type").pack()
-        self.constraint_type = tk.StringVar(value="forbid")
-        tk.OptionMenu(self, self.constraint_type, "forbid", "require", "limit").pack()
+        severity = st.selectbox("Severity", ["hard", "soft"])
 
-        tk.Label(self, text="Constraint Target").pack()
-        self.target = tk.Entry(self)
-        self.target.pack()
+        if st.button("Add Rule"):
+            if not rule_id or not rule_text:
+                st.warning("Rule ID and description are required.")
+            else:
+                canon.add_rule({
+                    "id": rule_id,
+                    "text": rule_text,
+                    "severity": severity,
+                    "conditions": {"all": []},
+                    "constraint": {},
+                })
+                save_current_canon()
+                st.success("Rule added to canon.")
 
-        tk.Button(self, text="Save Rule", command=self.save).pack(pady=10)
+    st.divider()
 
-        self.rules_list = tk.Listbox(self, width=60)
-        self.rules_list.pack(pady=5)
+    # ---------------- EDIT EXISTING RULES ----------------
+    rules = list_rules(canon)
 
-    def save(self):
-        self.rule["reason"] = self.reason.get()
-        self.rule["constraint"]["type"] = self.constraint_type.get()
-        self.rule["constraint"]["value"] = self.target.get()
+    if not rules:
+        st.info("No rules defined yet.")
+        return
 
-        try:
-            validate_rule(self.rule)
-        except Exception as e:
-            alert(str(e))
-            return
+    st.markdown("#### Existing rules")
 
-        self.canon.add_rule(self.rule)
-        self.rules_list.insert(tk.END, f"{self.rule['id']} — {self.rule['reason']}")
-        alert("Rule added to canon")
-        self.rule = new_rule()
-        self.reason.delete(0, tk.END)
-        self.target.delete(0, tk.END)
+    rule_ids = [r.get("id") for r in rules]
+    selected = st.selectbox("Select rule", rule_ids)
+
+    rule = next(r for r in rules if r.get("id") == selected)
+
+    new_text = st.text_area(
+        "Edit rule description",
+        value=rule.get("text", ""),
+        height=100
+    )
+
+    if st.button("Update Rule"):
+        update_rule(selected, new_text, canon)
+        save_current_canon()
+        st.success("Rule updated.")

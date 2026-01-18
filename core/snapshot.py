@@ -14,3 +14,22 @@ def take_snapshot(canon, act):
         "active_rules": [r["id"] for r in canon.rules],
         "truth_hash": truth_hash(canon.truths)
     }
+
+# ---- UI ADAPTERS ----
+
+_TIMELINE = []
+
+def record_snapshot(canon, act):
+    """
+    Records a snapshot into the in-memory timeline.
+    """
+    snapshot = take_snapshot(canon, act)
+    _TIMELINE.append(snapshot)
+    return snapshot
+
+def get_timeline():
+    """
+    UI-facing adapter.
+    Returns recorded narrative snapshots.
+    """
+    return list(_TIMELINE)
